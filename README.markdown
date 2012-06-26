@@ -20,6 +20,8 @@ If it was under the "admin" namespace e.g. `app/controllers/admin/posts_controll
     assets/javascript/post**  - Any javascript file starting with "post"
     assets/stylesheets/post** - Any stylesheet file starting with "post"
     controllers/post**        - Any controller file starting with "post"
+    specs/**/post**           - Any spec file starting with "post"
+    test/**/post**            - Any test file starting with "post"
 
  `post.rb` model under `app/models`
 
@@ -28,6 +30,8 @@ If it was under the "admin" namespace e.g. `app/controllers/admin/posts_controll
     views/**/posts/**     - All files in this folder (e.g. admin namespace)
     controllers/post**    - Any controller starting with "post"
     controllers/**/post** - Any controller starting with "post" (e.g. admin namespace)
+    specs/**/post**       - Any spec file starting with "post"
+    test/**/post**        - Any test file starting with "post"
 
 If you want to disable the context menu, just edit the `Rails.sublime-settings` file changing "show_context_menu" to false.
 

@@ -20,6 +20,9 @@ class RailsRelatedFilesHelper:
   @staticmethod
   def get_directory_listing_without_folders(path):
 
+    # Clean up the spec and test paths
+    path = path.replace('app/../', '')
+
     files = []
     result = glob.glob(path)
 
@@ -44,9 +47,11 @@ class RailsRelatedFilesHelper:
       controller = os.path.join(working_directory_base, controller)
 
     walkers = [
-      'models/'  + model      + '*',   # Models
-      'helpers/' + model      + '**'   # Helpers
-      'views/'   + controller + '/**'  # Views
+      'models/'  + model      + '*',    # Models
+      'helpers/' + model      + '**',   # Helpers
+      'views/'   + controller + '/**',  # Views
+      '../spec/**/' + model  + '*',      # Specs
+      '../test/**/' + model  + '*'      # Tests
     ]
 
     return RailsRelatedFilesHelper.get_files_while_walking(app_folder, walkers)
@@ -70,9 +75,11 @@ class RailsRelatedFilesHelper:
       'helpers/'            + model + '**',
       'assets/javascripts/' + model + '**',
       'assets/stylesheets/' + model + '**',
-      'controllers/'        + controller + '**'
+      'controllers/'        + controller + '**',
+      '../spec/**/' + model  + '*',
+      '../test/**/' + model  + '*'
     ]
-    
+
     return RailsRelatedFilesHelper.get_files_while_walking(app_folder, walkers)
   
   @staticmethod
@@ -83,11 +90,51 @@ class RailsRelatedFilesHelper:
     
     walkers = [
       'models/'         + model      + '**',
-      'helpers/'        + model      + '**',  # Helpers
-      'views/'          + controller + '/**', # Views
+      'helpers/'        + model      + '**',   # Helpers
+      'views/'          + controller + '/**',  # Views
       'views/**/'       + controller + '/**',  # Views
-      'controllers/'    + controller + '**',  # Controllers looks under controllers/model** 
-      'controllers/**/' + controller + '**',  # Controllers looks under controllers/**sub directories**/model**
+      'controllers/'    + controller + '**',   # Controllers looks under controllers/model** 
+      'controllers/**/' + controller + '**',   # Controllers looks under controllers/**sub directories**/model**
+      '../spec/**/'     + model      + '*',    # Specs
+      '../test/**/'     + model      + '*'     # Tests
+    ]
+
+    return RailsRelatedFilesHelper.get_files_while_walking(app_folder, walkers)
+
+  @staticmethod
+  def for_specs(app_folder, working_directory, file_name_base_no_ext):
+    file_name_base_no_ext = file_name_base_no_ext.replace('_spec', '')
+    model = Inflector(English).singularize(file_name_base_no_ext).lower()
+    controller = Inflector(English).pluralize(file_name_base_no_ext).lower()
+
+    walkers = [
+      'models/'         + model      + '**',
+      'helpers/'        + model      + '**',   # Helpers
+      'views/'          + controller + '/**',  # Views
+      'views/**/'       + controller + '/**',  # Views
+      'controllers/'    + controller + '**',   # Controllers looks under controllers/model** 
+      'controllers/**/' + controller + '**',   # Controllers looks under controllers/**sub directories**/model**
+      '../spec/**/'     + model      + '*',    # Specs
+      '../test/**/'     + model      + '*'     # Tests
+    ]
+
+    return RailsRelatedFilesHelper.get_files_while_walking(app_folder, walkers)
+
+  @staticmethod
+  def for_tests(app_folder, working_directory, file_name_base_no_ext):
+    file_name_base_no_ext = file_name_base_no_ext.replace('_test', '')
+    model = Inflector(English).singularize(file_name_base_no_ext).lower()
+    controller = Inflector(English).pluralize(file_name_base_no_ext).lower()
+
+    walkers = [
+      'models/'         + model      + '**',
+      'helpers/'        + model      + '**',   # Helpers
+      'views/'          + controller + '/**',  # Views
+      'views/**/'       + controller + '/**',  # Views
+      'controllers/'    + controller + '**',   # Controllers looks under controllers/model** 
+      'controllers/**/' + controller + '**',   # Controllers looks under controllers/**sub directories**/model**
+      '../spec/**/'     + model      + '*',    # Specs
+      '../test/**/'     + model      + '*'     # Tests
     ]
 
     return RailsRelatedFilesHelper.get_files_while_walking(app_folder, walkers)
@@ -95,7 +142,7 @@ class RailsRelatedFilesHelper:
   @staticmethod
   def get_app_sub_directory(filename):
 
-    regex = re.compile('(views|controllers|helpers|models|assets)')
+    regex = re.compile('(views|controllers|helpers|models|assets|spec|test)')
     match = regex.findall(filename)
 
     if match:
@@ -124,23 +171,28 @@ class RailsRelatedFilesHelper:
   def get_files_while_walking(app_folder, walkers):
 
     files = []
-      
+
     for walker in walkers:
 
       files += (
         RailsRelatedFilesHelper().get_directory_listing_without_folders(app_folder + '/' + walker)
       )
 
+    rails_root_directory = app_folder.replace('app', '')
+
     files_without_full_path = []
     for _file in files:
 
-      files_without_full_path += [_file.replace(app_folder + '/', 'app/')]
+        if (app_folder) in _file:
+          files_without_full_path += [_file.replace(app_folder + '/', 'app/')]
+        elif (((rails_root_directory + 'spec') in _file) or ((rails_root_directory + 'test') in _file)):
+          files_without_full_path += [_file.replace(rails_root_directory, '')]
 
     return files_without_full_path
 
 class RailsRelatedFilesCommand(sublime_plugin.TextCommand):
   
-  APP_FOLDERS = ['controllers', 'models', 'views'] #assets, helpers
+  APP_FOLDERS = ['controllers', 'models', 'views', 'test', 'spec'] #assets, helpers
 
   def run(self, edit, index):
 
@@ -187,6 +239,7 @@ class RailsRelatedFilesCommand(sublime_plugin.TextCommand):
       self.show_context_menu = sublime.load_settings("Rails.sublime-settings").get('show_context_menu')
 
       current_file_name      = self._active_file_name()
+
       working_directory      = self.get_working_dir()
       working_directory_base = os.path.basename(working_directory)
 
@@ -202,7 +255,9 @@ class RailsRelatedFilesCommand(sublime_plugin.TextCommand):
         func, args = {
           'controllers': (RailsRelatedFilesHelper.for_controllers, (rails_app_directory, working_directory, file_name_base_no_ext,)),
           'views'      : (RailsRelatedFilesHelper.for_views,       (rails_app_directory, working_directory,)),
-          'models'     : (RailsRelatedFilesHelper.for_models,      (rails_app_directory, working_directory, file_name_base_no_ext,))
+          'models'     : (RailsRelatedFilesHelper.for_models,      (rails_app_directory, working_directory, file_name_base_no_ext,)),
+          'spec'       : (RailsRelatedFilesHelper.for_specs,       (rails_app_directory, working_directory, file_name_base_no_ext,)),
+          'test'       : (RailsRelatedFilesHelper.for_tests,       (rails_app_directory, working_directory, file_name_base_no_ext,))
         }.get(app_sub_directory)
 
         self.files = func(*args)
